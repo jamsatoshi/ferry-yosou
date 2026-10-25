@@ -5,10 +5,10 @@
 :root{--bg:#f4f7f9;--fg:#1c2b33;--card:#fff;--a:#2a8f6a;--b:#e0a030;--c:#d0504a;--mut:#6b7c85}
 @media(prefers-color-scheme:dark){:root{--bg:#10181d;--fg:#e8eff2;--card:#1a262d;--mut:#8da0aa}}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 -apple-system,sans-serif}
-main{max-width:480px;margin:0 auto;padding:16px}
+main{max-width:480px;margin:0 auto;padding:16px}@media(min-width:900px){main{max-width:880px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}}
 h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:20px 0 8px;color:var(--mut)}.sub{color:var(--mut);font-size:13px;margin-bottom:12px}
 .tabs{display:flex;gap:6px;margin:12px 0 16px}
-.tabs button{flex:1;text-align:center;background:var(--card);color:var(--mut);padding:10px 4px;font-size:14px}
+.tabs button{flex:1;text-align:center;background:var(--card);color:var(--mut);padding:10px 2px;font-size:13px}
 .tabs button.on{background:var(--fg);color:var(--bg);font-weight:700}
 .card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
 .card.past{opacity:.6}
@@ -26,6 +26,7 @@ button{font:inherit;border:0;border-radius:10px;padding:12px;color:#fff;cursor:p
 .hit,.miss,.wait{display:inline-block;border-radius:20px;padding:1px 10px;font-size:13px;font-weight:700;color:#fff;margin-left:6px}
 .hit{background:var(--a)}.miss{background:var(--c)}.wait{background:var(--mut)}
 .pl{font-size:12px;font-weight:600;color:var(--mut);border:1px solid var(--mut);border-radius:20px;padding:1px 8px;margin-left:6px;vertical-align:middle}.note{color:var(--mut);font-size:12px;margin-top:16px}
+a.lk{display:block;background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;color:var(--fg);text-decoration:none}a.lk b{display:block}a.lk span{font-size:13px;color:var(--mut)}
 table{width:100%;border-collapse:collapse;font-size:14px}td{padding:6px 4px;border-bottom:1px solid rgba(128,128,128,.2)}.sun{color:#d0504a}
 </style></head><body><main id="app"></main>
 <script>
@@ -50,11 +51,14 @@ const weekStart=t=>{const s=new Date(t);s.setDate(s.getDate()-((s.getDay()+6)%7)
 // ※ サンプル：票の数字・実際の結果はダミー（本物ではありません）
 const seed=(key,n)=>{const d=+key.slice(-2);return [...Array(n).keys()].map(i=>((d*7+i*13)%17)+3)};
 const DEMO_VOTES={"2026-10-23":1,"2026-10-24":0,"2026-10-25":0};   // サンプルの予想（0始まり）
-const ACTUAL={"2026-10-23":1,"2026-10-24":0,"2026-10-25":2};       // サンプルの実際の結果
+const ACTUAL={"2026-10-23":1,"2026-10-24":0};       // サンプルの実際の結果
+const SHEET="https://docs.google.com/spreadsheets/d/1ZVWGKN5dFf_U9v9rNoGhbpI0E6kQ4eq6hgua5-iIgYE/gviz/tq?tqx=out:csv";
+const wordIdx=(key,w)=>SCHED[key]===""?(w=="振替"?1:(w=="欠航"||w=="便なし")?0:null):(w=="出る"?0:w=="日帰り"?1:w=="欠航"?2:null);
 let votes={};try{votes=JSON.parse(localStorage.getItem("ferryVotes")||"{}")}catch(e){}
 Object.keys(DEMO_VOTES).forEach(k=>{if(votes[k]==null)votes[k]=DEMO_VOTES[k]});
 const save=()=>{try{localStorage.setItem("ferryVotes",JSON.stringify(votes))}catch(e){}};
 const app=document.getElementById("app");let tab="yoso";
+fetch(SHEET).then(r=>r.text()).then(t=>{t.split("\n").slice(1).forEach(l=>{const f=[...l.matchAll(/"([^"]*)"/g)].map(m=>m[1]);if(f.length<2)return;const i=wordIdx(f[0],f[1]);if(i!=null)ACTUAL[f[0]]=i});if(!document.querySelector(".backbig"))render()}).catch(()=>{});
 function tally(key){const P=opts(key),c=seed(key,P.length).slice();const v=votes[key];if(v!=null&&v<c.length)c[v]++;return{P,c,tot:c.reduce((a,b)=>a+b,0)}}
 function summary(key){
  const{P,c,tot}=tally(key),top=c.indexOf(Math.max(...c)),me=votes[key];
@@ -63,14 +67,14 @@ function summary(key){
  return s;
 }
 function shell(body){
- const T=[["yoso","予想する"],["kekka","これまでの結果"],["yotei","船便予定"]];
+ const T=[["yoso","予想する"],["kekka","これまでの結果"],["yotei","船便予定"],["tenki","天気・運航"]];
  app.innerHTML=`<h1>フェリー、出る？出ない？</h1><div class="sub">予想は前日の24時まで。週は月曜〜日曜。</div>
  <div class="tabs">${T.map(([k,n])=>`<button class="${tab==k?"on":""}" onclick="go('${k}')">${n}</button>`).join("")}</div>${body}
  <div class="note">試作：票の数字と「実際の結果」はサンプルです。保存はこの端末だけ。</div>`;
  window.scrollTo(0,0);
 }
 function go(t){tab=t;render()}
-function render(){tab=="yoso"?yoso():tab=="kekka"?kekka():yotei()}
+function render(){tab=="yoso"?yoso():tab=="kekka"?kekka():tab=="yotei"?yotei():tenki()}
 function yoso(){
  let h="",lastW="";
  open.forEach(d=>{
@@ -98,6 +102,10 @@ function kekka(){
 function yotei(){
  const rows=Object.keys(SCHED).sort().filter(k=>k>=todayKey).map(k=>{const t=new Date(k+"T00:00:00");return`<tr><td class="${t.getDay()==0?"sun":""}">${lab(t)}</td><td>${tag(k)}</td></tr>`}).join("");
  shell(`<div class="sub">今後の出入港の予定（村の広報・令和8年10・11月）</div><div class="card"><table>${rows}</table></div>`);
+}
+function tenki(){
+ const L=[["運航情報（三島村役場）","今日のフェリーの出航情報。朝6時ごろに更新","https://mishimamura.com/"],["天気（ウェザーニュース 三島村）","今日・明日の天気","https://weathernews.jp/onebox/tenki/kagoshima/46303/"],["週間予報（ウェザーニュース 三島村）","1週間先まで","https://weathernews.jp/onebox/tenki/kagoshima/46303/week.html"],["風（ウェザーニュース 三島村）","風の強さ・向き","https://weathernews.jp/onebox/wind/kyushu/kagoshima/46303/"],["海の天気（ウミテンキ 三島村）","時間ごとの海・風","https://www.umitenki.jp/citiesweather/detail/463035/1hour"],["Yahoo!天気（鹿児島県）","県の天気。三島村だけのページは無し","https://weather.yahoo.co.jp/weather/jp/46/"]];
+ shell(`<div class="sub">船が出るかの判断に使うサイトです（外のサイトに移ります）。</div><div class="grid">${L.map(([n,d,u])=>`<a class="lk" href="${u}" target="_blank" rel="noopener"><b>${n}</b><span>${d}</span></a>`).join("")}</div>`);
 }
 function vote(k,j){votes[k]=j;save();result(k)}
 function result(k){
