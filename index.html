@@ -2,13 +2,15 @@
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>フェリー予想（試作）</title>
 <style>
-:root{--bg:#f4f7f9;--fg:#1c2b33;--card:#fff;--a:#2a8f6a;--b:#e0a030;--c:#d0504a;--mut:#6b7c85}
-@media(prefers-color-scheme:dark){:root{--bg:#10181d;--fg:#e8eff2;--card:#1a262d;--mut:#8da0aa}}
+:root{--edge:#1c2b33;--bg:#f4f7f9;--fg:#1c2b33;--card:#fff;--a:#2a8f6a;--b:#e0a030;--c:#d0504a;--mut:#6b7c85}
+@media(prefers-color-scheme:dark){:root{--edge:#fff;--bg:#10181d;--fg:#e8eff2;--card:#1a262d;--mut:#8da0aa}}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 -apple-system,sans-serif}
 main{max-width:480px;margin:0 auto;padding:16px}@media(min-width:900px){main{max-width:880px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}}
 h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:20px 0 8px;color:var(--mut)}.sub{color:var(--mut);font-size:13px;margin-bottom:12px}
 .tabs{display:flex;gap:6px;margin:12px 0 16px}
-.tabs button{flex:1;text-align:center;background:var(--card);color:var(--mut);padding:10px 2px;font-size:13px}
+.tabs button{flex:1;text-align:center;background:var(--card);color:var(--mut);padding:10px 2px;font-size:13px;border:2px solid var(--edge)}
+.sel{outline:3px solid var(--edge);outline-offset:2px}.dim{opacity:.45}
+.blue{width:100%;background:#2f6fdc;text-align:center;font-weight:700;margin-bottom:10px}
 .tabs button.on{background:var(--fg);color:var(--bg);font-weight:700}
 .card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
 .card.past{opacity:.6}
@@ -82,15 +84,37 @@ function shell(body){
 function go(t){tab=t;render()}
 function render(){tab=="yoso"?yoso():tab=="kekka"?kekka():tab=="yotei"?yotei():tenki()}
 function weeks(){const g=[];open.forEach(d=>{const ws=fmt(weekStart(d.t));let w=g.find(x=>x.ws===ws);if(!w){w={ws,days:[],t:weekStart(d.t)};g.push(w)}w.days.push(d)});return g}
+function wlabel(w){const e=new Date(w.t);e.setDate(e.getDate()+6);return `${lab(w.t).replace(/（.）/,"")}〜${lab(e).replace(/（.）/,"")} の週（月〜日）`}
 function yoso(){
- const G=weeks();if(wk>=G.length)wk=0;const w=G[wk];const e=new Date(w.t);e.setDate(e.getDate()+6);
- let h=`<h2>${lab(w.t).replace(/（.）/,"")}〜${lab(e).replace(/（.）/,"")} の週（月〜日）</h2><div class="sub">いままでの回答者：${SV.respondents}人</div>`;
+ const G=weeks();if(wk>=G.length)wk=0;const w=G[wk];
+ const done=w.days.filter(d=>votes[d.key]!=null).length;
+ let h=`<h2>${wlabel(w)}</h2><div class="sub">1週間えらんで、いちばん下の青いボタンでまとめて送ります（予想済み ${done}/${w.days.length}）。いままでの回答者：${SV.respondents}人</div>`;
  w.days.forEach(d=>{
-  const voted=votes[d.key]!=null;
-  h+=`<div class="card"><div class="day">${d.label}${voted?" ✓":""} <span class="pl">${tag(d.key)}</span></div>${voted?`<div class="sum" onclick="result('${d.key}')" style="margin-bottom:8px;cursor:pointer">${summary(d.key)}（タップで結果）</div>`:""}<div class="opts">${opts(d.key).map((p,j)=>`<button class="${p.c}" onclick="vote('${d.key}',${j})">${p.n}</button>`).join("")}</div></div>`;
+  const me=votes[d.key];
+  h+=`<div class="card"><div class="day">${d.label}${me!=null?" ✓":""} <span class="pl">${tag(d.key)}</span></div><div class="opts">${opts(d.key).map((p,j)=>`<button class="${p.c} ${me===j?"sel":(me!=null?"dim":"")}" onclick="pick('${d.key}',${j})">${p.n}</button>`).join("")}</div></div>`;
  });
- h+=`<div class="opts" style="grid-template-columns:1fr 1fr">${wk>0?`<button class="nav" onclick="wk--;render()">← 前の週</button>`:"<span></span>"}${wk<G.length-1?`<button class="nav" onclick="wk++;render()">次の週 →</button>`:"<span></span>"}</div>`;
+ h+=`<button class="blue" onclick="submitWeek()">予想結果まとめ（送信して見る）</button><div class="opts" style="grid-template-columns:1fr 1fr">${wk>0?`<button class="nav" onclick="wk--;render()">← 前の週</button>`:"<span></span>"}${wk<G.length-1?`<button class="nav" onclick="wk++;render()">次の週 →</button>`:"<span></span>"}</div>`;
  shell(h);
+}
+function pick(k,j){votes[k]=j;save();const y=window.scrollY;yoso();window.scrollTo(0,y)}
+function submitWeek(){
+ const w=weeks()[wk];
+ const items=w.days.filter(d=>votes[d.key]!=null).map(d=>({date:d.key,idx:votes[d.key],label:opts(d.key)[votes[d.key]].n}));
+ if(!items.length){alert("予想を1つ以上えらんでください");return}
+ app.innerHTML='<div class="card">送信中…（1週間ぶんを、まとめて1回で送っています）</div>';
+ fetch(API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain"},body:JSON.stringify({uid:UID,items})}).catch(()=>{}).then(()=>loadSV()).then(()=>showWeek());
+}
+function showWeek(){
+ const w=weeks()[wk];
+ let h=`<h1>予想結果まとめ</h1><div class="sub">${wlabel(w)}。回答者：${SV.respondents}人</div>`;
+ w.days.forEach(d=>{
+  const{P,c,tot,n}=tally(d.key),me=votes[d.key];
+  let mine=`<div class="sub">この日は予想していません</div>`;
+  if(me!=null&&me<P.length){const rank=[...c].sort((a,b)=>b-a).indexOf(c[me])+1;mine=`<div class="me" style="font-size:16px">あなた：${P[me].n}（${rank}位・${Math.round(c[me]/tot*100)}%）</div>`}
+  h+=`<div class="card"><div class="day">${d.label} <span class="pl">${tag(d.key)}</span></div>${mine}${P.map((p,j)=>`<div class="bar ${j==me?"mine":""}"><div class="l"><span>${p.n}${j==me?" ←あなた":""}</span><span>${Math.round(c[j]/tot*100)}%（${c[j]}票）</span></div><div class="t"><div class="f" style="width:${c[j]/tot*100}%;background:${p.k}"></div></div></div>`).join("")}<div class="sub">全${n}票</div></div>`;
+ });
+ h+=`<button class="backbig" onclick="go('yoso')">予想のページに戻る</button>`;
+ app.innerHTML=h;window.scrollTo(0,0);
 }
 function kekka(){
  const keys=[...Array(14)].map((_,i)=>mk(-i)).filter(d=>votes[d.key]!=null||ACTUAL[d.key]!=null);
@@ -111,7 +135,7 @@ function yotei(){
  shell(`<div class="sub">今後の出入港の予定（村の広報・令和8年10・11月）</div><div class="card"><table>${rows}</table></div>`);
 }
 function tenki(){
- const L=[["台風・進路（気象庁の地図）","台風の位置と進路","https://www.jma.go.jp/bosai/map.html#3/23.08/144.229/&elem=root&typhoon=all&contents=typhoon"],["予想図（weather-gpv.info）","天気の予想図（GPV）","http://weather-gpv.info/"],["運航情報（三島村役場）","今日のフェリーの出航情報。朝6時ごろに更新","https://mishimamura.com/"],["天気（ウェザーニュース 三島村）","今日・明日の天気","https://weathernews.jp/onebox/tenki/kagoshima/46303/"],["週間予報（ウェザーニュース 三島村）","1週間先まで","https://weathernews.jp/onebox/tenki/kagoshima/46303/week.html"],["風（ウェザーニュース 三島村）","風の強さ・向き","https://weathernews.jp/onebox/wind/kyushu/kagoshima/46303/"],["海の天気（ウミテンキ 三島村）","時間ごとの海・風","https://www.umitenki.jp/citiesweather/detail/463035/1hour"],["Yahoo!天気（鹿児島県）","県の天気。三島村だけのページは無し","https://weather.yahoo.co.jp/weather/jp/46/"]];
+ const L=[["運航情報（三島村役場）","今日のフェリーの出航情報。朝6時ごろに更新","https://mishimamura.com/"],["天気（ウェザーニュース 三島村）","今日・明日・1週間先まで","https://weathernews.jp/onebox/tenki/kagoshima/46303/"],["風（ウェザーニュース 三島村）","風の強さ・向き","https://weathernews.jp/onebox/wind/kyushu/kagoshima/46303/"],["台風情報（ウェザーニュース）","台風の進路予想図","https://weathernews.jp/typhoon/"],["Yahoo!天気（鹿児島県）","県の天気。三島村だけのページは無し","https://weather.yahoo.co.jp/weather/jp/46/"],["海の天気（ウミテンキ 三島村）","時間ごとの海・風","https://www.umitenki.jp/citiesweather/detail/463035/1hour"],["気象庁（台風の地図）","台風の位置と進路","https://www.jma.go.jp/bosai/map.html#3/23.08/144.229/&elem=root&typhoon=all&contents=typhoon"],["予想図（weather-gpv.info）","天気の予想図（GPV）","http://weather-gpv.info/"]];
  shell(`<div class="sub">船が出るかの判断に使うサイトです（外のサイトに移ります）。</div><div class="grid">${L.map(([n,d,u])=>`<a class="lk" href="${u}" target="_blank" rel="noopener"><b>${n}</b><span>${d}</span></a>`).join("")}</div>`);
 }
 function vote(k,j){votes[k]=j;save();app.innerHTML='<div class="card">送信中…</div>';const P=opts(k);fetch(API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain"},body:JSON.stringify({uid:UID,date:k,idx:j,label:P[j].n})}).catch(()=>{}).then(()=>loadSV()).then(()=>result(k))}
