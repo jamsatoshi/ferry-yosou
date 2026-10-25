@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>フェリー予想（試作）</title>
+<style>
+:root{--bg:#f4f7f9;--fg:#1c2b33;--card:#fff;--a:#2a8f6a;--b:#e0a030;--c:#d0504a;--mut:#6b7c85}
+@media(prefers-color-scheme:dark){:root{--bg:#10181d;--fg:#e8eff2;--card:#1a262d;--mut:#8da0aa}}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 -apple-system,sans-serif}
+main{max-width:480px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0 0 4px}.sub{color:var(--mut);font-size:13px;margin-bottom:16px}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
+.day{font-weight:700;margin-bottom:8px}
+.opts{display:grid;gap:8px}
+button{font:inherit;border:0;border-radius:10px;padding:12px;color:#fff;cursor:pointer;text-align:left}
+.o0{background:var(--a)}.o1{background:var(--b)}.o2{background:var(--c)}
+.back{background:none;color:var(--mut);padding:0;margin-bottom:12px}
+.me{font-size:20px;font-weight:700;margin:6px 0 12px}
+.bar{margin:8px 0}.bar .l{display:flex;justify-content:space-between;font-size:14px}
+.bar .t{height:12px;background:rgba(128,128,128,.2);border-radius:6px;overflow:hidden}
+.bar .f{height:100%}.mine{font-weight:700}
+.pl{font-size:12px;font-weight:600;color:var(--mut);border:1px solid var(--mut);border-radius:20px;padding:1px 8px;margin-left:6px;vertical-align:middle}.note{color:var(--mut);font-size:12px;margin-top:16px}
+</style></head><body><main id="app"></main>
+<script>
+const P3=[{n:"通常通り出る",c:"o0",k:"var(--a)"},{n:"日帰り便に変更して出る",c:"o1",k:"var(--b)"},{n:"欠航",c:"o2",k:"var(--c)"}];
+// 便なしの日は、振替で出るかどうかを予想する
+const P2=[{n:"予定どおり便なし",c:"o2",k:"var(--c)"},{n:"振替で出る",c:"o0",k:"var(--a)"}];
+const P3D=[P3[0],{n:"日帰り便で出る",c:"o1",k:"var(--b)"},P3[2]];
+const opts=k=>SCHED[k]===""?P2:SCHED[k]==="出入"?P3D:P3;
+// ※ サンプルの票（試作用のダミー）
+const seed=(d,n)=>[...Array(n).keys()].map(i=>((d*7+i*13)%17)+3);
+const W=["日","月","火","水","木","金","土"];
+// 村の広報（令和8年10・11月）の船便予定。出＝出港／入＝入港／出入＝日帰り便。空欄の日は便なし
+const OCT="入,出入,出,入,,出入,出,入,出入,出,入,,出,入,,出,入,出入,,出入,出,入,出入,出,入,,出入,出,入,出入,出".split(",");
+const NOV="入,,出入,出,入,出,入,,出入,,出,入,出入,出,入,,,,,出入,出,入,,,,,出入,出,入,".split(",");
+const SCHED={};OCT.forEach((v,i)=>SCHED["2026-10-"+String(i+1).padStart(2,"0")]=v);NOV.forEach((v,i)=>SCHED["2026-11-"+String(i+1).padStart(2,"0")]=v);
+const tag=k=>{const v=SCHED[k];return v==null?"予定未掲載":v==""?"便なし":v=="出入"?"出入（日帰り便）":v=="出"?"出港":"入港"};
+const days=[...Array(7)].map((_,i)=>{const t=new Date();t.setDate(t.getDate()+i);return{key:`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`,label:`${t.getMonth()+1}/${t.getDate()}（${W[t.getDay()]}）`,i}});
+let votes={};try{votes=JSON.parse(localStorage.getItem("ferryVotes")||"{}")}catch(e){}
+const save=()=>{try{localStorage.setItem("ferryVotes",JSON.stringify(votes))}catch(e){}};
+const app=document.getElementById("app");
+function home(){
+ app.innerHTML=`<h1>フェリー、出る？出ない？</h1><div class="sub">1週間の予想。1日ごとに1票。</div>`+days.map(d=>`
+ <div class="card"><div class="day">${d.label}${votes[d.key]!=null?" ✓":""} <span class="pl">${tag(d.key)}</span></div><div class="opts">
+ ${opts(d.key).map((p,j)=>`<button class="${p.c}" onclick="vote('${d.key}',${j},${d.i})">${p.n}</button>`).join("")}</div></div>`).join("")+
+ `<div class="note">試作：票の数字はサンプルです。保存はこの端末だけ。</div>`;
+}
+function vote(k,j,di){votes[k]=j;save();result(k,di)}
+function result(k,di){
+ const d=days[di],P=opts(k),c=seed(di,P.length).slice();if(votes[k]!=null)c[votes[k]]++;
+ const tot=c.reduce((a,b)=>a+b,0),me=votes[k];
+ const rank=[...c].sort((a,b)=>b-a).indexOf(c[me])+1;
+ app.innerHTML=`<button class="back" onclick="home()">← 戻る</button><h1>${d.label} <span class="pl">${tag(d.key)}</span></h1>
+ <div class="card"><div class="me">あなたは ${rank}位（${Math.round(c[me]/tot*100)}%）</div>
+ ${P.map((p,j)=>`<div class="bar ${j==me?"mine":""}"><div class="l"><span>${p.n}${j==me?" ←あなた":""}</span><span>${Math.round(c[j]/tot*100)}%（${c[j]}票）</span></div><div class="t"><div class="f" style="width:${c[j]/tot*100}%;background:${p.k}"></div></div></div>`).join("")}
+ <div class="sub">全${tot}票</div></div>`;
+}
+home();
+</script></body></html>
