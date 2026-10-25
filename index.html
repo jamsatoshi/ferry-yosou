@@ -8,15 +8,18 @@ body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 -apple-system,s
 main{max-width:480px;margin:0 auto;padding:16px}
 h1{font-size:20px;margin:0 0 4px}.sub{color:var(--mut);font-size:13px;margin-bottom:16px}
 .card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
+.card.past{opacity:.55;background:rgba(128,128,128,.15)}
 .day{font-weight:700;margin-bottom:8px}
 .opts{display:grid;gap:8px}
 button{font:inherit;border:0;border-radius:10px;padding:12px;color:#fff;cursor:pointer;text-align:left}
 .o0{background:var(--a)}.o1{background:var(--b)}.o2{background:var(--c)}
 .back{background:none;color:var(--mut);padding:0;margin-bottom:12px}
+.backbig{width:100%;margin-top:16px;background:var(--fg);color:var(--bg);text-align:center;font-weight:700}
 .me{font-size:20px;font-weight:700;margin:6px 0 12px}
 .bar{margin:8px 0}.bar .l{display:flex;justify-content:space-between;font-size:14px}
 .bar .t{height:12px;background:rgba(128,128,128,.2);border-radius:6px;overflow:hidden}
 .bar .f{height:100%}.mine{font-weight:700}
+.sum{font-size:14px;margin-top:4px}
 .pl{font-size:12px;font-weight:600;color:var(--mut);border:1px solid var(--mut);border-radius:20px;padding:1px 8px;margin-left:6px;vertical-align:middle}.note{color:var(--mut);font-size:12px;margin-top:16px}
 </style></head><body><main id="app"></main>
 <script>
@@ -33,25 +36,40 @@ const OCT="入,出入,出,入,,出入,出,入,出入,出,入,,出,入,,出,入,�
 const NOV="入,,出入,出,入,出,入,,出入,,出,入,出入,出,入,,,,,出入,出,入,,,,,出入,出,入,".split(",");
 const SCHED={};OCT.forEach((v,i)=>SCHED["2026-10-"+String(i+1).padStart(2,"0")]=v);NOV.forEach((v,i)=>SCHED["2026-11-"+String(i+1).padStart(2,"0")]=v);
 const tag=k=>{const v=SCHED[k];return v==null?"予定未掲載":v==""?"便なし":v=="出入"?"出入（日帰り便）":v=="出"?"出港":"入港"};
-const days=[...Array(7)].map((_,i)=>{const t=new Date();t.setDate(t.getDate()+i);return{key:`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`,label:`${t.getMonth()+1}/${t.getDate()}（${W[t.getDay()]}）`,i}});
+// 日曜はじまりの1週間。過ぎた日はグレーで結果だけ、今日からは予想できる
+const fmt=t=>`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`;
+const now=new Date(),todayKey=fmt(now);
+const days=[...Array(7)].map((_,i)=>{const t=new Date(now);t.setDate(t.getDate()-t.getDay()+i);const key=fmt(t);return{key,label:`${t.getMonth()+1}/${t.getDate()}（${W[t.getDay()]}）`,i,past:key<todayKey}});
 let votes={};try{votes=JSON.parse(localStorage.getItem("ferryVotes")||"{}")}catch(e){}
 const save=()=>{try{localStorage.setItem("ferryVotes",JSON.stringify(votes))}catch(e){}};
 const app=document.getElementById("app");
+function tally(d){const P=opts(d.key),c=seed(d.i,P.length).slice();if(votes[d.key]!=null&&votes[d.key]<c.length)c[votes[d.key]]++;const tot=c.reduce((a,b)=>a+b,0);return{P,c,tot}}
+function summary(d){
+ const{P,c,tot}=tally(d),top=c.indexOf(Math.max(...c)),me=votes[d.key];
+ let s=`みんなの予想：${P[top].n} ${Math.round(c[top]/tot*100)}%（${tot}票）`;
+ if(me!=null&&me<c.length){const rank=[...c].sort((a,b)=>b-a).indexOf(c[me])+1;s+=`<br>あなた：${P[me].n}（${rank}位・${Math.round(c[me]/tot*100)}%）`}
+ return s;
+}
 function home(){
- app.innerHTML=`<h1>フェリー、出る？出ない？</h1><div class="sub">1週間の予想。1日ごとに1票。</div>`+days.map(d=>`
- <div class="card"><div class="day">${d.label}${votes[d.key]!=null?" ✓":""} <span class="pl">${tag(d.key)}</span></div><div class="opts">
- ${opts(d.key).map((p,j)=>`<button class="${p.c}" onclick="vote('${d.key}',${j},${d.i})">${p.n}</button>`).join("")}</div></div>`).join("")+
+ app.innerHTML=`<h1>フェリー、出る？出ない？</h1><div class="sub">今週の予想。過ぎた日は結果だけ見られます。</div>`+days.map(d=>{
+  const head=`<div class="day">${d.label}${votes[d.key]!=null?" ✓":""} <span class="pl">${tag(d.key)}</span></div>`;
+  if(d.past)return `<div class="card past">${head}<div class="sum">${summary(d)}</div></div>`;
+  const voted=votes[d.key]!=null;
+  return `<div class="card">${head}${voted?`<div class="sum" onclick="result('${d.key}',${d.i})" style="margin-bottom:8px;cursor:pointer">${summary(d)}（タップで結果）</div>`:""}<div class="opts">
+  ${opts(d.key).map((p,j)=>`<button class="${p.c}" onclick="vote('${d.key}',${j},${d.i})">${p.n}</button>`).join("")}</div></div>`}).join("")+
  `<div class="note">試作：票の数字はサンプルです。保存はこの端末だけ。</div>`;
+ window.scrollTo(0,0);
 }
 function vote(k,j,di){votes[k]=j;save();result(k,di)}
 function result(k,di){
- const d=days[di],P=opts(k),c=seed(di,P.length).slice();if(votes[k]!=null)c[votes[k]]++;
- const tot=c.reduce((a,b)=>a+b,0),me=votes[k];
+ const d=days[di],{P,c,tot}=tally(d),me=votes[k];
  const rank=[...c].sort((a,b)=>b-a).indexOf(c[me])+1;
  app.innerHTML=`<button class="back" onclick="home()">← 戻る</button><h1>${d.label} <span class="pl">${tag(d.key)}</span></h1>
  <div class="card"><div class="me">あなたは ${rank}位（${Math.round(c[me]/tot*100)}%）</div>
  ${P.map((p,j)=>`<div class="bar ${j==me?"mine":""}"><div class="l"><span>${p.n}${j==me?" ←あなた":""}</span><span>${Math.round(c[j]/tot*100)}%（${c[j]}票）</span></div><div class="t"><div class="f" style="width:${c[j]/tot*100}%;background:${p.k}"></div></div></div>`).join("")}
- <div class="sub">全${tot}票</div></div>`;
+ <div class="sub">全${tot}票</div></div>
+ <button class="backbig" onclick="home()">予想のページに戻る（1週間の結果）</button>`;
+ window.scrollTo(0,0);
 }
 home();
 </script></body></html>
