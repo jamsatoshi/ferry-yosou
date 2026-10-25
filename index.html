@@ -26,6 +26,7 @@ button{font:inherit;border:0;border-radius:10px;padding:12px;color:#fff;cursor:p
 .hit,.miss,.wait{display:inline-block;border-radius:20px;padding:1px 10px;font-size:13px;font-weight:700;color:#fff;margin-left:6px}
 .hit{background:var(--a)}.miss{background:var(--c)}.wait{background:var(--mut)}
 .pl{font-size:12px;font-weight:600;color:var(--mut);border:1px solid var(--mut);border-radius:20px;padding:1px 8px;margin-left:6px;vertical-align:middle}.note{color:var(--mut);font-size:12px;margin-top:16px}
+.nav{background:var(--card);color:var(--fg);text-align:center}
 a.lk{display:block;background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;color:var(--fg);text-decoration:none}a.lk b{display:block}a.lk span{font-size:13px;color:var(--mut)}
 table{width:100%;border-collapse:collapse;font-size:14px}td{padding:6px 4px;border-bottom:1px solid rgba(128,128,128,.2)}.sun{color:#d0504a}
 </style></head><body><main id="app"></main>
@@ -58,11 +59,16 @@ let votes={};try{votes=JSON.parse(localStorage.getItem("ferryVotes")||"{}")}catc
 Object.keys(DEMO_VOTES).forEach(k=>{if(votes[k]==null)votes[k]=DEMO_VOTES[k]});
 const save=()=>{try{localStorage.setItem("ferryVotes",JSON.stringify(votes))}catch(e){}};
 const app=document.getElementById("app");let tab="yoso";
+const API="https://script.google.com/macros/s/AKfycbyYhdO4-pQNZhM1k9eyrGgxArB7DQdaQfynV38F7GZBWZG4VAt5ZhbojGu-QhOwOa4/exec";
+let UID;try{UID=localStorage.getItem("ferryUid");if(!UID){UID=(crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now());localStorage.setItem("ferryUid",UID)}}catch(e){UID=String(Math.random()).slice(2)}
+let SV={votes:{},respondents:0},wk=0;
+const loadSV=()=>fetch(API).then(r=>r.json()).then(j=>{SV=j}).catch(()=>{});
+loadSV().then(()=>{if(!document.querySelector(".backbig"))render()});
 fetch(SHEET).then(r=>r.text()).then(t=>{t.split("\n").slice(1).forEach(l=>{const f=[...l.matchAll(/"([^"]*)"/g)].map(m=>m[1]);if(f.length<2)return;const i=wordIdx(f[0],f[1]);if(i!=null)ACTUAL[f[0]]=i});if(!document.querySelector(".backbig"))render()}).catch(()=>{});
-function tally(key){const P=opts(key),c=seed(key,P.length).slice();const v=votes[key];if(v!=null&&v<c.length)c[v]++;return{P,c,tot:c.reduce((a,b)=>a+b,0)}}
+function tally(key){const P=opts(key);let c;if(DEMO_VOTES[key]!=null){c=seed(key,P.length).slice();const v=votes[key];if(v!=null&&v<c.length)c[v]++}else{c=(SV.votes[key]||[0,0,0]).slice(0,P.length).map(Number)}const n=c.reduce((a,b)=>a+b,0);return{P,c,tot:Math.max(1,n),n}}
 function summary(key){
- const{P,c,tot}=tally(key),top=c.indexOf(Math.max(...c)),me=votes[key];
- let s=`みんなの予想：${P[top].n} ${Math.round(c[top]/tot*100)}%（${tot}票）`;
+ const{P,c,tot,n}=tally(key),top=c.indexOf(Math.max(...c)),me=votes[key];
+ let s=`みんなの予想：${P[top].n} ${Math.round(c[top]/tot*100)}%（${n}票）`;
  if(me!=null&&me<c.length){const rank=[...c].sort((a,b)=>b-a).indexOf(c[me])+1;s+=`<br>あなた：${P[me].n}（${rank}位・${Math.round(c[me]/tot*100)}%）`}
  return s;
 }
@@ -75,14 +81,15 @@ function shell(body){
 }
 function go(t){tab=t;render()}
 function render(){tab=="yoso"?yoso():tab=="kekka"?kekka():tab=="yotei"?yotei():tenki()}
+function weeks(){const g=[];open.forEach(d=>{const ws=fmt(weekStart(d.t));let w=g.find(x=>x.ws===ws);if(!w){w={ws,days:[],t:weekStart(d.t)};g.push(w)}w.days.push(d)});return g}
 function yoso(){
- let h="",lastW="";
- open.forEach(d=>{
-  const ws=fmt(weekStart(d.t));
-  if(ws!==lastW){lastW=ws;const e=new Date(weekStart(d.t));e.setDate(e.getDate()+6);h+=`<h2>${lab(weekStart(d.t)).replace(/（.）/,"")}〜${lab(e).replace(/（.）/,"")} の週</h2>`}
+ const G=weeks();if(wk>=G.length)wk=0;const w=G[wk];const e=new Date(w.t);e.setDate(e.getDate()+6);
+ let h=`<h2>${lab(w.t).replace(/（.）/,"")}〜${lab(e).replace(/（.）/,"")} の週（月〜日）</h2><div class="sub">いままでの回答者：${SV.respondents}人</div>`;
+ w.days.forEach(d=>{
   const voted=votes[d.key]!=null;
   h+=`<div class="card"><div class="day">${d.label}${voted?" ✓":""} <span class="pl">${tag(d.key)}</span></div>${voted?`<div class="sum" onclick="result('${d.key}')" style="margin-bottom:8px;cursor:pointer">${summary(d.key)}（タップで結果）</div>`:""}<div class="opts">${opts(d.key).map((p,j)=>`<button class="${p.c}" onclick="vote('${d.key}',${j})">${p.n}</button>`).join("")}</div></div>`;
  });
+ h+=`<div class="opts" style="grid-template-columns:1fr 1fr">${wk>0?`<button class="nav" onclick="wk--;render()">← 前の週</button>`:"<span></span>"}${wk<G.length-1?`<button class="nav" onclick="wk++;render()">次の週 →</button>`:"<span></span>"}</div>`;
  shell(h);
 }
 function kekka(){
@@ -107,14 +114,14 @@ function tenki(){
  const L=[["台風・進路（気象庁の地図）","台風の位置と進路","https://www.jma.go.jp/bosai/map.html#3/23.08/144.229/&elem=root&typhoon=all&contents=typhoon"],["予想図（weather-gpv.info）","天気の予想図（GPV）","http://weather-gpv.info/"],["運航情報（三島村役場）","今日のフェリーの出航情報。朝6時ごろに更新","https://mishimamura.com/"],["天気（ウェザーニュース 三島村）","今日・明日の天気","https://weathernews.jp/onebox/tenki/kagoshima/46303/"],["週間予報（ウェザーニュース 三島村）","1週間先まで","https://weathernews.jp/onebox/tenki/kagoshima/46303/week.html"],["風（ウェザーニュース 三島村）","風の強さ・向き","https://weathernews.jp/onebox/wind/kyushu/kagoshima/46303/"],["海の天気（ウミテンキ 三島村）","時間ごとの海・風","https://www.umitenki.jp/citiesweather/detail/463035/1hour"],["Yahoo!天気（鹿児島県）","県の天気。三島村だけのページは無し","https://weather.yahoo.co.jp/weather/jp/46/"]];
  shell(`<div class="sub">船が出るかの判断に使うサイトです（外のサイトに移ります）。</div><div class="grid">${L.map(([n,d,u])=>`<a class="lk" href="${u}" target="_blank" rel="noopener"><b>${n}</b><span>${d}</span></a>`).join("")}</div>`);
 }
-function vote(k,j){votes[k]=j;save();result(k)}
+function vote(k,j){votes[k]=j;save();app.innerHTML='<div class="card">送信中…</div>';const P=opts(k);fetch(API,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain"},body:JSON.stringify({uid:UID,date:k,idx:j,label:P[j].n})}).catch(()=>{}).then(()=>loadSV()).then(()=>result(k))}
 function result(k){
- const{P,c,tot}=tally(k),me=votes[k],t=new Date(k+"T00:00:00");
+ const{P,c,tot,n}=tally(k),me=votes[k],t=new Date(k+"T00:00:00");
  const rank=[...c].sort((a,b)=>b-a).indexOf(c[me])+1;
  app.innerHTML=`<button class="back" onclick="go('yoso')">← 戻る</button><h1>${lab(t)} <span class="pl">${tag(k)}</span></h1>
  <div class="card"><div class="me">あなたは ${rank}位（${Math.round(c[me]/tot*100)}%）</div>
  ${P.map((p,j)=>`<div class="bar ${j==me?"mine":""}"><div class="l"><span>${p.n}${j==me?" ←あなた":""}</span><span>${Math.round(c[j]/tot*100)}%（${c[j]}票）</span></div><div class="t"><div class="f" style="width:${c[j]/tot*100}%;background:${p.k}"></div></div></div>`).join("")}
- <div class="sub">全${tot}票</div></div>
+ <div class="sub">全${n}票</div></div>
  <button class="backbig" onclick="go('yoso')">予想のページに戻る</button>`;
  window.scrollTo(0,0);
 }
