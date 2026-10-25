@@ -102,17 +102,24 @@ function go(t){tab=t;render()}
 function render(){tab=="yoso"?yoso():tab=="kekka"?kekka():tab=="yotei"?yotei():tenki()}
 function weeks(){const g=[];open.forEach(d=>{const ws=fmt(weekStart(d.t));let w=g.find(x=>x.ws===ws);if(!w){w={ws,days:[],t:weekStart(d.t)};g.push(w)}w.days.push(d)});return g}
 function wlabel(w){const e=new Date(w.t);e.setDate(e.getDate()+6);return `${lab(w.t).replace(/（.）/,"")}〜${lab(e).replace(/（.）/,"")} の週（月〜日）`}
+function NOTICE(){return `<div class="card" style="font-size:14px;line-height:1.6">⚠ 実際の運航は、${ISL==="硫黄島"?'<a href="https://mishimamura.com/" target="_blank" rel="noopener" style="color:#2f6fdc">三島村役場の情報</a>':"役場・船会社の公式の情報"}で確認してください。ここは「みんなの予想」です。</div>`}
 function yoso(){
  const G=weeks();if(wk>=G.length)wk=0;const w=G[wk];
  const done=w.days.filter(d=>votes[d.key]!=null).length;
- let h=`<h2>${wlabel(w)}</h2><div class="sub">1週間えらんで、いちばん下の青いボタンでまとめて送ります（予想済み ${done}/${w.days.length}）。いままでの回答者：${SV.respondents}人</div>`;
+ let h=`${NOTICE()}<h2>${wlabel(w)}</h2><div class="sub">1週間えらんで、いちばん下の青いボタンでまとめて送ります（予想済み ${done}/${w.days.length}）。いままでの回答者：${SV.respondents}人</div>`;
  w.days.forEach(d=>{
   const me=votes[d.key];
   h+=`<div class="card"><div class="day">${d.label}${me!=null?" ✓":""} <span class="pl">${tag(d.key)}</span></div><div class="opts">${opts(d.key).map((p,j)=>`<button class="${p.c} ${me===j?"sel":(me!=null?"dim":"")}" onclick="pick('${d.key}',${j})">${p.n}</button>`).join("")}</div></div>`;
  });
  h+=`<button class="blue" onclick="submitWeek()">予想結果まとめ（送信して見る）</button><div class="opts" style="grid-template-columns:1fr 1fr">${wk>0?`<button class="nav" onclick="wk--;render()">← 前の週</button>`:"<span></span>"}${wk<G.length-1?`<button class="nav" onclick="wk++;render()">次の週 →</button>`:"<span></span>"}</div>`;
- shell(h);
+ h+=shareCard();shell(h);
 }
+const shareUrl=()=>location.href.split("?")[0].split("#")[0];
+function shareCard(){const u=encodeURIComponent(shareUrl());const t=encodeURIComponent("フェリー、出るの？出ないの？｜島のみんなの予想サイト");
+ const a=(h,n)=>`<a class="lk" style="margin:0" target="_blank" rel="noopener" href="${h}"><b>${n}</b></a>`;
+ return `<div class="card" style="margin-top:14px"><div class="day">このページを共有する</div><div class="opts"><button class="blue" style="margin:0" onclick="shareNative()">共有する（スマホの共有メニュー）</button><button class="nav" onclick="copyLink()">リンクをコピー</button>${a("https://line.me/R/msg/text/?"+t+"%0A"+u,"LINEで送る")}${a("https://twitter.com/intent/tweet?text="+t+"&url="+u,"Xで投稿")}${a("https://www.facebook.com/sharer/sharer.php?u="+u,"Facebookで共有")}</div><div class="sub" id="shmsg" style="margin-top:8px"></div></div>`}
+function shareNative(){if(navigator.share){navigator.share({title:"フェリー、出るの？出ないの？",text:"島のみんなの予想サイト",url:shareUrl()}).catch(()=>{})}else copyLink()}
+function copyLink(){const url=shareUrl();const done=()=>{const m=document.getElementById("shmsg");if(m)m.textContent="リンクをコピーしました"};if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(done).catch(()=>prompt("このリンクをコピーしてください",url))}else prompt("このリンクをコピーしてください",url)}
 function pick(k,j){votes[k]=j;save();const y=window.scrollY;yoso();window.scrollTo(0,y)}
 function submitWeek(){
  const w=weeks()[wk];
