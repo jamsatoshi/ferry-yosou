@@ -58,7 +58,7 @@ const DEMO_VOTES={"2026-10-23":1,"2026-10-24":0,"2026-10-25":0};   // サンプ�
 const ACTUAL={"2026-10-23":1,"2026-10-24":0};const actOf=k=>ISL==="硫黄島"?ACTUAL[k]:undefined;       // サンプルの実際の結果
 const SHEET="https://docs.google.com/spreadsheets/d/1ZVWGKN5dFf_U9v9rNoGhbpI0E6kQ4eq6hgua5-iIgYE/gviz/tq?tqx=out:csv";
 const wordIdx=(key,w)=>sched(key)===""?(w=="振替"?1:(w=="欠航"||w=="便なし")?0:null):(w=="出る"?0:w=="日帰り"?1:w=="欠航"?2:null);
-const ISLANDS=["硫黄島","久米島村"];
+const ISLANDS=["硫黄島","屋久島","宮古島"];
 let ISL="硫黄島";try{const x=localStorage.getItem("ferryIsl");if(ISLANDS.includes(x))ISL=x}catch(e){}
 const vkey=()=>ISL==="硫黄島"?"ferryVotes":"ferryVotes:"+ISL;
 const loadVotes=()=>{let v={};try{v=JSON.parse(localStorage.getItem(vkey())||"{}")}catch(e){}if(ISL==="硫黄島")Object.keys(DEMO_VOTES).forEach(k=>{if(v[k]==null)v[k]=DEMO_VOTES[k]});return v};
@@ -77,7 +77,7 @@ const saveMe=()=>{try{localStorage.setItem(mekey(),JSON.stringify(ME))}catch(e){
 const IQ=()=>"&island="+encodeURIComponent(ISL);
 function registerMe(){if(ME)return;const isl=ISL;fetch(API+"?action=register&uid="+encodeURIComponent(UID)+IQ()).then(r=>r.json()).then(j=>{if(j.no&&isl===ISL){ME={no:j.no,name:j.name};saveMe();if(!document.querySelector(".backbig"))render()}}).catch(()=>{})}
 registerMe();
-function setIsl(v){if(!ISLANDS.includes(v))return;ISL=v;try{localStorage.setItem("ferryIsl",v)}catch(e){}ME=loadMe();votes=loadVotes();SV={votes:{},respondents:0};wk=0;tab="yoso";render();loadSV().then(()=>{if(!document.querySelector(".backbig"))render()});registerMe()}
+function setIsl(v){if(v==="__new"){alert("島の追加は、サンプルです。「うちの島でもやりたい」という方は、作った人に声をかけてください。");render();return}if(!ISLANDS.includes(v))return;ISL=v;try{localStorage.setItem("ferryIsl",v)}catch(e){}ME=loadMe();votes=loadVotes();SV={votes:{},respondents:0};wk=0;tab="yoso";render();loadSV().then(()=>{if(!document.querySelector(".backbig"))render()});registerMe()}
 function rename(){const v=prompt("表示する名前を入れてください（ひらがな・カタカナ・漢字・英語OK。20文字まで）",ME?ME.name:"");if(v==null)return;const nm=v.replace(/[<>"']/g,"").trim().slice(0,20);if(!nm||!ME)return;ME.name=nm;saveMe();render();fetch(API+"?action=name&uid="+encodeURIComponent(UID)+"&name="+encodeURIComponent(nm)+IQ()).catch(()=>{})}
 const loadSV=()=>{const isl=ISL;return fetch(API+"?island="+encodeURIComponent(isl)).then(r=>r.json()).then(j=>{if(isl!==ISL)return;SV=j;Object.entries(j.actual||{}).forEach(([k,w])=>{const i=wordIdx(k,w);if(i!=null)ACTUAL[k]=i})}).catch(()=>{})};
 loadSV().then(()=>{if(!document.querySelector(".backbig"))render()});
@@ -92,7 +92,7 @@ function summary(key){
 function shell(body){
  const T=[["yoso","予想する"],["kekka","これまでの結果"],["yotei","船便予定"],["tenki","天気・運航"]];
  app.innerHTML=`<h1>フェリー、出る？出ない？</h1><div class="sub">予想は前日の24時まで。週は月曜〜日曜。</div>
- <div class="sub">島：<select onchange="setIsl(this.value)" style="font-size:16px;padding:6px 10px;background:var(--card);color:var(--fg);border:2px solid var(--edge);border-radius:8px">${ISLANDS.map(x=>`<option${x===ISL?" selected":""}>${x}</option>`).join("")}</select></div>
+ <div class="sub">島：<select onchange="setIsl(this.value)" style="font-size:16px;padding:6px 10px;background:var(--card);color:var(--fg);border:2px solid var(--edge);border-radius:8px">${ISLANDS.map(x=>`<option${x===ISL?" selected":""}>${x}</option>`).join("")}<option value="__new">＋新しい島を追加</option></select></div>
  <div class="sub">あなた：<b>${ME?esc(ME.name):"番号を取得中…"}</b>${ME&&ME.name!==ME.no?`（番号 ${esc(ME.no)}）`:""} <button class="nav" style="display:inline-block;width:auto;padding:4px 12px;font-size:13px;border:2px solid var(--edge)" onclick="rename()">名前を変える</button></div>
  <div class="tabs">${T.map(([k,n])=>`<button class="${tab==k?"on":""}" onclick="go('${k}')">${n}</button>`).join("")}</div>${body}
  <div class="note">試作：票の数字と「実際の結果」はサンプルです。保存はこの端末だけ。</div>`;
