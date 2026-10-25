@@ -64,9 +64,14 @@ const app=document.getElementById("app");let tab="yoso";
 const API="https://script.google.com/macros/s/AKfycbyYhdO4-pQNZhM1k9eyrGgxArB7DQdaQfynV38F7GZBWZG4VAt5ZhbojGu-QhOwOa4/exec";
 let UID;try{UID=localStorage.getItem("ferryUid");if(!UID){UID=(crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now());localStorage.setItem("ferryUid",UID)}}catch(e){UID=String(Math.random()).slice(2)}
 let SV={votes:{},respondents:0},wk=0;
-const loadSV=()=>fetch(API).then(r=>r.json()).then(j=>{SV=j}).catch(()=>{});
+let ME=null;try{ME=JSON.parse(localStorage.getItem("ferryMe")||"null")}catch(e){}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const saveMe=()=>{try{localStorage.setItem("ferryMe",JSON.stringify(ME))}catch(e){}};
+if(!ME)fetch(API+"?action=register&uid="+encodeURIComponent(UID)).then(r=>r.json()).then(j=>{if(j.no){ME={no:j.no,name:j.name};saveMe();if(!document.querySelector(".backbig"))render()}}).catch(()=>{});
+function rename(){const v=prompt("表示する名前を入れてください（ひらがな・カタカナ・漢字・英語OK。20文字まで）",ME?ME.name:"");if(v==null)return;const nm=v.replace(/[<>"']/g,"").trim().slice(0,20);if(!nm||!ME)return;ME.name=nm;saveMe();render();fetch(API+"?action=name&uid="+encodeURIComponent(UID)+"&name="+encodeURIComponent(nm)).catch(()=>{})}
+const loadSV=()=>fetch(API).then(r=>r.json()).then(j=>{SV=j;Object.entries(j.actual||{}).forEach(([k,w])=>{const i=wordIdx(k,w);if(i!=null)ACTUAL[k]=i})}).catch(()=>{});
 loadSV().then(()=>{if(!document.querySelector(".backbig"))render()});
-fetch(SHEET).then(r=>r.text()).then(t=>{t.split("\n").slice(1).forEach(l=>{const f=[...l.matchAll(/"([^"]*)"/g)].map(m=>m[1]);if(f.length<2)return;const i=wordIdx(f[0],f[1]);if(i!=null)ACTUAL[f[0]]=i});if(!document.querySelector(".backbig"))render()}).catch(()=>{});
+
 function tally(key){const P=opts(key);let c;if(DEMO_VOTES[key]!=null){c=seed(key,P.length).slice();const v=votes[key];if(v!=null&&v<c.length)c[v]++}else{c=(SV.votes[key]||[0,0,0]).slice(0,P.length).map(Number)}const n=c.reduce((a,b)=>a+b,0);return{P,c,tot:Math.max(1,n),n}}
 function summary(key){
  const{P,c,tot,n}=tally(key),top=c.indexOf(Math.max(...c)),me=votes[key];
@@ -77,6 +82,7 @@ function summary(key){
 function shell(body){
  const T=[["yoso","予想する"],["kekka","これまでの結果"],["yotei","船便予定"],["tenki","天気・運航"]];
  app.innerHTML=`<h1>フェリー、出る？出ない？</h1><div class="sub">予想は前日の24時まで。週は月曜〜日曜。</div>
+ <div class="sub">あなた：<b>${ME?esc(ME.name):"番号を取得中…"}</b>${ME&&ME.name!==ME.no?`（番号 ${esc(ME.no)}）`:""} <button class="nav" style="display:inline-block;width:auto;padding:4px 12px;font-size:13px;border:2px solid var(--edge)" onclick="rename()">名前を変える</button></div>
  <div class="tabs">${T.map(([k,n])=>`<button class="${tab==k?"on":""}" onclick="go('${k}')">${n}</button>`).join("")}</div>${body}
  <div class="note">試作：票の数字と「実際の結果」はサンプルです。保存はこの端末だけ。</div>`;
  window.scrollTo(0,0);
