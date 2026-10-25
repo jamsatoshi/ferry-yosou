@@ -104,7 +104,7 @@ function yotei(){
  shell(`<div class="sub">今後の出入港の予定（村の広報・令和8年10・11月）</div><div class="card"><table>${rows}</table></div>`);
 }
 function tenki(){
- const L=[["運航情報（三島村役場）","今日のフェリーの出航情報。朝6時ごろに更新","https://mishimamura.com/"],["天気（ウェザーニュース 三島村）","今日・明日の天気","https://weathernews.jp/onebox/tenki/kagoshima/46303/"],["週間予報（ウェザーニュース 三島村）","1週間先まで","https://weathernews.jp/onebox/tenki/kagoshima/46303/week.html"],["風（ウェザーニュース 三島村）","風の強さ・向き","https://weathernews.jp/onebox/wind/kyushu/kagoshima/46303/"],["海の天気（ウミテンキ 三島村）","時間ごとの海・風","https://www.umitenki.jp/citiesweather/detail/463035/1hour"],["Yahoo!天気（鹿児島県）","県の天気。三島村だけのページは無し","https://weather.yahoo.co.jp/weather/jp/46/"]];
+ const L=[["台風・進路（気象庁の地図）","台風の位置と進路","https://www.jma.go.jp/bosai/map.html#3/23.08/144.229/&elem=root&typhoon=all&contents=typhoon"],["予想図（weather-gpv.info）","天気の予想図（GPV）","http://weather-gpv.info/"],["運航情報（三島村役場）","今日のフェリーの出航情報。朝6時ごろに更新","https://mishimamura.com/"],["天気（ウェザーニュース 三島村）","今日・明日の天気","https://weathernews.jp/onebox/tenki/kagoshima/46303/"],["週間予報（ウェザーニュース 三島村）","1週間先まで","https://weathernews.jp/onebox/tenki/kagoshima/46303/week.html"],["風（ウェザーニュース 三島村）","風の強さ・向き","https://weathernews.jp/onebox/wind/kyushu/kagoshima/46303/"],["海の天気（ウミテンキ 三島村）","時間ごとの海・風","https://www.umitenki.jp/citiesweather/detail/463035/1hour"],["Yahoo!天気（鹿児島県）","県の天気。三島村だけのページは無し","https://weather.yahoo.co.jp/weather/jp/46/"]];
  shell(`<div class="sub">船が出るかの判断に使うサイトです（外のサイトに移ります）。</div><div class="grid">${L.map(([n,d,u])=>`<a class="lk" href="${u}" target="_blank" rel="noopener"><b>${n}</b><span>${d}</span></a>`).join("")}</div>`);
 }
 function vote(k,j){votes[k]=j;save();result(k)}
