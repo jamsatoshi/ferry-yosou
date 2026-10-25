@@ -6,9 +6,12 @@
 @media(prefers-color-scheme:dark){:root{--bg:#10181d;--fg:#e8eff2;--card:#1a262d;--mut:#8da0aa}}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 -apple-system,sans-serif}
 main{max-width:480px;margin:0 auto;padding:16px}
-h1{font-size:20px;margin:0 0 4px}.sub{color:var(--mut);font-size:13px;margin-bottom:16px}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:20px 0 8px;color:var(--mut)}.sub{color:var(--mut);font-size:13px;margin-bottom:12px}
+.tabs{display:flex;gap:6px;margin:12px 0 16px}
+.tabs button{flex:1;text-align:center;background:var(--card);color:var(--mut);padding:10px 4px;font-size:14px}
+.tabs button.on{background:var(--fg);color:var(--bg);font-weight:700}
 .card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
-.card.past{opacity:.55;background:rgba(128,128,128,.15)}
+.card.past{opacity:.6}
 .day{font-weight:700;margin-bottom:8px}
 .opts{display:grid;gap:8px}
 button{font:inherit;border:0;border-radius:10px;padding:12px;color:#fff;cursor:pointer;text-align:left}
@@ -20,7 +23,10 @@ button{font:inherit;border:0;border-radius:10px;padding:12px;color:#fff;cursor:p
 .bar .t{height:12px;background:rgba(128,128,128,.2);border-radius:6px;overflow:hidden}
 .bar .f{height:100%}.mine{font-weight:700}
 .sum{font-size:14px;margin-top:4px}
+.hit,.miss,.wait{display:inline-block;border-radius:20px;padding:1px 10px;font-size:13px;font-weight:700;color:#fff;margin-left:6px}
+.hit{background:var(--a)}.miss{background:var(--c)}.wait{background:var(--mut)}
 .pl{font-size:12px;font-weight:600;color:var(--mut);border:1px solid var(--mut);border-radius:20px;padding:1px 8px;margin-left:6px;vertical-align:middle}.note{color:var(--mut);font-size:12px;margin-top:16px}
+table{width:100%;border-collapse:collapse;font-size:14px}td{padding:6px 4px;border-bottom:1px solid rgba(128,128,128,.2)}.sun{color:#d0504a}
 </style></head><body><main id="app"></main>
 <script>
 const P3=[{n:"通常通り出る",c:"o0",k:"var(--a)"},{n:"日帰り便に変更して出る",c:"o1",k:"var(--b)"},{n:"欠航",c:"o2",k:"var(--c)"}];
@@ -28,48 +34,81 @@ const P3=[{n:"通常通り出る",c:"o0",k:"var(--a)"},{n:"日帰り便に変更
 const P2=[{n:"予定どおり便なし",c:"o2",k:"var(--c)"},{n:"振替で出る",c:"o0",k:"var(--a)"}];
 const P3D=[P3[0],{n:"日帰り便で出る",c:"o1",k:"var(--b)"},P3[2]];
 const opts=k=>SCHED[k]===""?P2:SCHED[k]==="出入"?P3D:P3;
-// ※ サンプルの票（試作用のダミー）
-const seed=(d,n)=>[...Array(n).keys()].map(i=>((d*7+i*13)%17)+3);
-const W=["日","月","火","水","木","金","土"];
 // 村の広報（令和8年10・11月）の船便予定。出＝出港／入＝入港／出入＝日帰り便。空欄の日は便なし
 const OCT="入,出入,出,入,,出入,出,入,出入,出,入,,出,入,,出,入,出入,,出入,出,入,出入,出,入,,出入,出,入,出入,出".split(",");
 const NOV="入,,出入,出,入,出,入,,出入,,出,入,出入,出,入,,,,,出入,出,入,,,,,出入,出,入,".split(",");
 const SCHED={};OCT.forEach((v,i)=>SCHED["2026-10-"+String(i+1).padStart(2,"0")]=v);NOV.forEach((v,i)=>SCHED["2026-11-"+String(i+1).padStart(2,"0")]=v);
 const tag=k=>{const v=SCHED[k];return v==null?"予定未掲載":v==""?"便なし":v=="出入"?"出入（日帰り便）":v=="出"?"出港":"入港"};
-// 日曜はじまりの1週間。過ぎた日はグレーで結果だけ、今日からは予想できる
+const W=["日","月","火","水","木","金","土"];
 const fmt=t=>`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`;
+const lab=t=>`${t.getMonth()+1}/${t.getDate()}（${W[t.getDay()]}）`;
 const now=new Date(),todayKey=fmt(now);
-const days=[...Array(7)].map((_,i)=>{const t=new Date(now);t.setDate(t.getDate()-t.getDay()+i);const key=fmt(t);return{key,label:`${t.getMonth()+1}/${t.getDate()}（${W[t.getDay()]}）`,i,past:key<todayKey}});
+const mk=off=>{const t=new Date(now);t.setDate(t.getDate()+off);return{t,key:fmt(t),label:lab(t)}};
+// 予想は前日の24時まで。明日以降の日だけ受け付ける（2週間先まで）
+const open=[...Array(14)].map((_,i)=>mk(i+1));
+const weekStart=t=>{const s=new Date(t);s.setDate(s.getDate()-((s.getDay()+6)%7));return s};
+// ※ サンプル：票の数字・実際の結果はダミー（本物ではありません）
+const seed=(key,n)=>{const d=+key.slice(-2);return [...Array(n).keys()].map(i=>((d*7+i*13)%17)+3)};
+const DEMO_VOTES={"2026-10-23":1,"2026-10-24":0,"2026-10-25":0};   // サンプルの予想（0始まり）
+const ACTUAL={"2026-10-23":1,"2026-10-24":0,"2026-10-25":2};       // サンプルの実際の結果
 let votes={};try{votes=JSON.parse(localStorage.getItem("ferryVotes")||"{}")}catch(e){}
+Object.keys(DEMO_VOTES).forEach(k=>{if(votes[k]==null)votes[k]=DEMO_VOTES[k]});
 const save=()=>{try{localStorage.setItem("ferryVotes",JSON.stringify(votes))}catch(e){}};
-const app=document.getElementById("app");
-function tally(d){const P=opts(d.key),c=seed(d.i,P.length).slice();if(votes[d.key]!=null&&votes[d.key]<c.length)c[votes[d.key]]++;const tot=c.reduce((a,b)=>a+b,0);return{P,c,tot}}
-function summary(d){
- const{P,c,tot}=tally(d),top=c.indexOf(Math.max(...c)),me=votes[d.key];
+const app=document.getElementById("app");let tab="yoso";
+function tally(key){const P=opts(key),c=seed(key,P.length).slice();const v=votes[key];if(v!=null&&v<c.length)c[v]++;return{P,c,tot:c.reduce((a,b)=>a+b,0)}}
+function summary(key){
+ const{P,c,tot}=tally(key),top=c.indexOf(Math.max(...c)),me=votes[key];
  let s=`みんなの予想：${P[top].n} ${Math.round(c[top]/tot*100)}%（${tot}票）`;
  if(me!=null&&me<c.length){const rank=[...c].sort((a,b)=>b-a).indexOf(c[me])+1;s+=`<br>あなた：${P[me].n}（${rank}位・${Math.round(c[me]/tot*100)}%）`}
  return s;
 }
-function home(){
- app.innerHTML=`<h1>フェリー、出る？出ない？</h1><div class="sub">今週の予想。過ぎた日は結果だけ見られます。</div>`+days.map(d=>{
-  const head=`<div class="day">${d.label}${votes[d.key]!=null?" ✓":""} <span class="pl">${tag(d.key)}</span></div>`;
-  if(d.past)return `<div class="card past">${head}<div class="sum">${summary(d)}</div></div>`;
-  const voted=votes[d.key]!=null;
-  return `<div class="card">${head}${voted?`<div class="sum" onclick="result('${d.key}',${d.i})" style="margin-bottom:8px;cursor:pointer">${summary(d)}（タップで結果）</div>`:""}<div class="opts">
-  ${opts(d.key).map((p,j)=>`<button class="${p.c}" onclick="vote('${d.key}',${j},${d.i})">${p.n}</button>`).join("")}</div></div>`}).join("")+
- `<div class="note">試作：票の数字はサンプルです。保存はこの端末だけ。</div>`;
+function shell(body){
+ const T=[["yoso","予想する"],["kekka","これまでの結果"],["yotei","船便予定"]];
+ app.innerHTML=`<h1>フェリー、出る？出ない？</h1><div class="sub">予想は前日の24時まで。週は月曜〜日曜。</div>
+ <div class="tabs">${T.map(([k,n])=>`<button class="${tab==k?"on":""}" onclick="go('${k}')">${n}</button>`).join("")}</div>${body}
+ <div class="note">試作：票の数字と「実際の結果」はサンプルです。保存はこの端末だけ。</div>`;
  window.scrollTo(0,0);
 }
-function vote(k,j,di){votes[k]=j;save();result(k,di)}
-function result(k,di){
- const d=days[di],{P,c,tot}=tally(d),me=votes[k];
+function go(t){tab=t;render()}
+function render(){tab=="yoso"?yoso():tab=="kekka"?kekka():yotei()}
+function yoso(){
+ let h="",lastW="";
+ open.forEach(d=>{
+  const ws=fmt(weekStart(d.t));
+  if(ws!==lastW){lastW=ws;const e=new Date(weekStart(d.t));e.setDate(e.getDate()+6);h+=`<h2>${lab(weekStart(d.t)).replace(/（.）/,"")}〜${lab(e).replace(/（.）/,"")} の週</h2>`}
+  const voted=votes[d.key]!=null;
+  h+=`<div class="card"><div class="day">${d.label}${voted?" ✓":""} <span class="pl">${tag(d.key)}</span></div>${voted?`<div class="sum" onclick="result('${d.key}')" style="margin-bottom:8px;cursor:pointer">${summary(d.key)}（タップで結果）</div>`:""}<div class="opts">${opts(d.key).map((p,j)=>`<button class="${p.c}" onclick="vote('${d.key}',${j})">${p.n}</button>`).join("")}</div></div>`;
+ });
+ shell(h);
+}
+function kekka(){
+ const keys=[...Array(14)].map((_,i)=>mk(-i)).filter(d=>votes[d.key]!=null||ACTUAL[d.key]!=null);
+ let h=`<div class="sub">過ぎた日の「予想」と「実際」。</div>`;
+ if(!keys.length)h+=`<div class="card">まだありません。</div>`;
+ keys.forEach(d=>{
+  const P=opts(d.key),me=votes[d.key],ac=ACTUAL[d.key];
+  let badge=`<span class="wait">結果待ち</span>`;
+  if(ac!=null&&me!=null)badge=me===ac?`<span class="hit">ぴったり！当たり</span>`:`<span class="miss">はずれ</span>`;
+  else if(ac!=null)badge=`<span class="wait">予想なし</span>`;
+  h+=`<div class="card past"><div class="day">${d.label} <span class="pl">${tag(d.key)}</span>${badge}</div>
+  <div class="sum">あなたの予想：${me!=null?P[me].n:"（なし）"}<br>実際：${ac!=null?P[ac].n:"（まだ）"}<br>${summary(d.key)}</div></div>`;
+ });
+ shell(h);
+}
+function yotei(){
+ const rows=Object.keys(SCHED).sort().filter(k=>k>=todayKey).map(k=>{const t=new Date(k+"T00:00:00");return`<tr><td class="${t.getDay()==0?"sun":""}">${lab(t)}</td><td>${tag(k)}</td></tr>`}).join("");
+ shell(`<div class="sub">今後の出入港の予定（村の広報・令和8年10・11月）</div><div class="card"><table>${rows}</table></div>`);
+}
+function vote(k,j){votes[k]=j;save();result(k)}
+function result(k){
+ const{P,c,tot}=tally(k),me=votes[k],t=new Date(k+"T00:00:00");
  const rank=[...c].sort((a,b)=>b-a).indexOf(c[me])+1;
- app.innerHTML=`<button class="back" onclick="home()">← 戻る</button><h1>${d.label} <span class="pl">${tag(d.key)}</span></h1>
+ app.innerHTML=`<button class="back" onclick="go('yoso')">← 戻る</button><h1>${lab(t)} <span class="pl">${tag(k)}</span></h1>
  <div class="card"><div class="me">あなたは ${rank}位（${Math.round(c[me]/tot*100)}%）</div>
  ${P.map((p,j)=>`<div class="bar ${j==me?"mine":""}"><div class="l"><span>${p.n}${j==me?" ←あなた":""}</span><span>${Math.round(c[j]/tot*100)}%（${c[j]}票）</span></div><div class="t"><div class="f" style="width:${c[j]/tot*100}%;background:${p.k}"></div></div></div>`).join("")}
  <div class="sub">全${tot}票</div></div>
- <button class="backbig" onclick="home()">予想のページに戻る（1週間の結果）</button>`;
+ <button class="backbig" onclick="go('yoso')">予想のページに戻る</button>`;
  window.scrollTo(0,0);
 }
-home();
+render();
 </script></body></html>
